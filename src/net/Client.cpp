@@ -36,6 +36,7 @@
 #include "rapidjson/error/en.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include "Rand_android.h"
 
 
 #ifdef XMRIG_PROXY_PROJECT

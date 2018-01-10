@@ -42,7 +42,7 @@
 #include "Options.h"
 #include "Platform.h"
 #include "workers/Workers.h"
-
+#include "Rand_android.h"
 
 Network::Network(const Options *options) :
     m_options(options),
