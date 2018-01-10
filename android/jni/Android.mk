@@ -39,7 +39,6 @@ LOCAL_SRC_FILES :=    \
     $(XMRIG_SRC_PATH)/src/App_unix.cpp \
     $(XMRIG_SRC_PATH)/src/Cpu_unix.cpp \
     $(XMRIG_SRC_PATH)/src/Mem_unix.cpp \
-    $(XMRIG_SRC_PATH)/src/Cpu_arm.cpp \
     $(XMRIG_SRC_PATH)/src/crypto/c_keccak.c \
     $(XMRIG_SRC_PATH)/src/crypto/c_groestl.c \
     $(XMRIG_SRC_PATH)/src/crypto/c_blake256.c \
@@ -54,7 +53,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../src $(LOCAL_PATH)/../libuv/include $(LOC
 LOCAL_CPPFLAGS += -pthread  -frtti -std=c++11  -Wall -fno-exceptions -fno-rtti -Wno-missing-braces
 LOCAL_CFLAGS   += -Ofast -funroll-loops -fmerge-all-constants -flax-vector-conversions
 LOCAL_CPPFLAGS += -Ofast -funroll-loops -fmerge-all-constants -flax-vector-conversions
-LOCAL_CFLAGS +=  -DXMRIG_ARM -DXMRIG_NO_HTTPD -DXMRIG_NO_API -DXMRIG_NO_LIBCPUID
+LOCAL_CFLAGS +=   -DXMRIG_NO_HTTPD -DXMRIG_NO_API -DXMRIG_NO_LIBCPUID
 
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 LOCAL_CFLAGS   += -mfpu=neon -march=armv7-a
@@ -65,11 +64,13 @@ LOCAL_CPPFLAGS += -march=armv8-a
 endif
 
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-LOCAL_CFLAGS += -DXMRIG_ARMv7
+LOCAL_CFLAGS += -DXMRIG_ARMv7 -DXMRIG_ARM
 LOCAL_LDLIBS +=  -luv_armv7
+LOCAL_SRC_FILES += $(XMRIG_SRC_PATH)/src/Cpu_arm.cpp
 else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
-LOCAL_CFLAGS += -DXMRIG_ARMv8 -DXMRIG_ARMv7
+LOCAL_CFLAGS += -DXMRIG_ARMv8 -DXMRIG_ARMv7 -DXMRIG_ARM
 LOCAL_LDLIBS +=  -luv_armv8
+LOCAL_SRC_FILES += $(XMRIG_SRC_PATH)/src/Cpu_arm.cpp
 endif
 
 LOCAL_LDFLAGS += -L$(LOCAL_PATH)/../libuv/lib
