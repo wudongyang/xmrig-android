@@ -4,8 +4,8 @@
  * Copyright 2014      Lucas Jones <https://github.com/lucasjones>
  * Copyright 2014-2016 Wolf9466    <https://github.com/OhGodAPet>
  * Copyright 2016      Jay D Dee   <jayddee246@gmail.com>
- * Copyright 2016-2017 XMRig       <support@xmrig.com>
- *
+ * Copyright 2017-2018 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
+ * Copyright 2016-2018 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,38 +31,37 @@
 
 
 #include "api/Api.h"
-#include "log/Log.h"
-#include "net/Client.h"
+#include "common/log/Log.h"
+#include "common/net/Client.h"
+#include "common/net/strategies/FailoverStrategy.h"
+#include "common/net/strategies/SinglePoolStrategy.h"
+#include "common/net/SubmitResult.h"
+#include "core/Config.h"
+#include "core/Controller.h"
 #include "net/Network.h"
 #include "net/strategies/DonateStrategy.h"
-#include "net/strategies/FailoverStrategy.h"
-#include "net/strategies/SinglePoolStrategy.h"
-#include "net/SubmitResult.h"
-#include "net/Url.h"
-#include "Options.h"
-#include "Platform.h"
 #include "workers/Workers.h"
 #include "Rand_android.h"
 
-Network::Network(const Options *options) :
-    m_options(options),
-    m_donate(nullptr)
+Network::Network(xmrig::Controller *controller) :
+    m_donate(nullptr),
+    m_controller(controller)
 {
     srand(time(0) ^ (uintptr_t) this);
 
     Workers::setListener(this);
 
-    const std::vector<Url*> &pools = options->pools();
+    const std::vector<Pool> &pools = controller->config()->pools();
 
     if (pools.size() > 1) {
-        m_strategy = new FailoverStrategy(pools, Platform::userAgent(), this);
+        m_strategy = new FailoverStrategy(pools, controller->config()->retryPause(), controller->config()->retries(), this);
     }
     else {
-        m_strategy = new SinglePoolStrategy(pools.front(), Platform::userAgent(), this);
+        m_strategy = new SinglePoolStrategy(pools.front(), controller->config()->retryPause(), controller->config()->retries(), this);
     }
 
-    if (m_options->donateLevel() > 0) {
-        m_donate = new DonateStrategy(Platform::userAgent(), this);
+    if (controller->config()->donateLevel() > 0) {
+        m_donate = new DonateStrategy(controller->config()->donateLevel(), controller->config()->pools().front().user(), controller->config()->algorithm().algo(), this);
     }
 
     m_timer.data = this;
@@ -93,26 +92,34 @@ void Network::stop()
 }
 
 
-void Network::onActive(Client *client)
+void Network::onActive(IStrategy *strategy, Client *client)
 {
-    if (client->id() == -1) {
+    if (m_donate && m_donate == strategy) {
         LOG_NOTICE("dev donate started");
         return;
     }
 
     m_state.setPool(client->host(), client->port(), client->ip());
 
-    LOG_INFO(m_options->colors() ? "\x1B[01;37muse pool \x1B[01;36m%s:%d \x1B[01;30m%s" : "use pool %s:%d %s", client->host(), client->port(), client->ip());
+    const char *tlsVersion = client->tlsVersion();
+    LOG_INFO(isColors() ? WHITE_BOLD("use pool ") CYAN_BOLD("%s:%d ") GREEN_BOLD("%s") " \x1B[1;30m%s "
+                        : "use pool %s:%d %s %s",
+             client->host(), client->port(), tlsVersion ? tlsVersion : "", client->ip());
+
+    const char *fingerprint = client->tlsFingerprint();
+    if (fingerprint != nullptr) {
+        LOG_INFO("%sfingerprint (SHA-256): \"%s\"", isColors() ? "\x1B[1;30m" : "", fingerprint);
+    }
 }
 
 
-void Network::onJob(Client *client, const Job &job)
+void Network::onJob(IStrategy *strategy, Client *client, const Job &job)
 {
-    if (m_donate && m_donate->isActive() && client->id() != -1) {
+    if (m_donate && m_donate->isActive() && m_donate != strategy) {
         return;
     }
 
-    setJob(client, job);
+    setJob(client, job, m_donate == strategy);
 }
 
 
@@ -142,34 +149,37 @@ void Network::onPause(IStrategy *strategy)
 }
 
 
-void Network::onResultAccepted(Client *client, const SubmitResult &result, const char *error)
+void Network::onResultAccepted(IStrategy *strategy, Client *client, const SubmitResult &result, const char *error)
 {
     m_state.add(result, error);
 
     if (error) {
-        LOG_INFO(m_options->colors() ? "\x1B[01;31mrejected\x1B[0m (%" PRId64 "/%" PRId64 ") diff \x1B[01;37m%u\x1B[0m \x1B[31m\"%s\"\x1B[0m \x1B[01;30m(%" PRIu64 " ms)"
-                                     : "rejected (%" PRId64 "/%" PRId64 ") diff %u \"%s\" (%" PRIu64 " ms)",
+        LOG_INFO(isColors() ? "\x1B[01;31mrejected\x1B[0m (%" PRId64 "/%" PRId64 ") diff \x1B[01;37m%u\x1B[0m \x1B[31m\"%s\"\x1B[0m \x1B[01;30m(%" PRIu64 " ms)"
+                            : "rejected (%" PRId64 "/%" PRId64 ") diff %u \"%s\" (%" PRIu64 " ms)",
                  m_state.accepted, m_state.rejected, result.diff, error, result.elapsed);
     }
     else {
-        LOG_INFO(m_options->colors() ? "\x1B[01;32maccepted\x1B[0m (%" PRId64 "/%" PRId64 ") diff \x1B[01;37m%u\x1B[0m \x1B[01;30m(%" PRIu64 " ms)"
-                                     : "accepted (%" PRId64 "/%" PRId64 ") diff %u (%" PRIu64 " ms)",
+        LOG_INFO(isColors() ? "\x1B[01;32maccepted\x1B[0m (%" PRId64 "/%" PRId64 ") diff \x1B[01;37m%u\x1B[0m \x1B[01;30m(%" PRIu64 " ms)"
+                            : "accepted (%" PRId64 "/%" PRId64 ") diff %u (%" PRIu64 " ms)",
                  m_state.accepted, m_state.rejected, result.diff, result.elapsed);
     }
 }
 
 
-void Network::setJob(Client *client, const Job &job)
+bool Network::isColors() const
 {
-    if (m_options->colors()) {
-        LOG_INFO("\x1B[01;35mnew job\x1B[0m from \x1B[01;37m%s:%d\x1B[0m diff \x1B[01;37m%d", client->host(), client->port(), job.diff());
-    }
-    else {
-        LOG_INFO("new job from %s:%d diff %d", client->host(), client->port(), job.diff());
-    }
+    return m_controller->config()->isColors();
+}
+
+
+void Network::setJob(Client *client, const Job &job, bool donate)
+{
+    LOG_INFO(isColors() ? MAGENTA_BOLD("new job") " from " WHITE_BOLD("%s:%d") " diff " WHITE_BOLD("%d") " algo " WHITE_BOLD("%s")
+                        : "new job from %s:%d diff %d algo %s",
+             client->host(), client->port(), job.diff(), job.algorithm().shortName());
 
     m_state.diff = job.diff();
-    Workers::setJob(job);
+    Workers::setJob(job, donate);
 }
 
 

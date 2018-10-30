@@ -4,8 +4,8 @@
  * Copyright 2014      Lucas Jones <https://github.com/lucasjones>
  * Copyright 2014-2016 Wolf9466    <https://github.com/OhGodAPet>
  * Copyright 2016      Jay D Dee   <jayddee246@gmail.com>
- * Copyright 2016-2017 XMRig       <support@xmrig.com>
- *
+ * Copyright 2017-2018 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
+ * Copyright 2016-2018 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 
 
 #include "api/NetworkState.h"
-#include "net/SubmitResult.h"
+#include "common/net/SubmitResult.h"
 
 
 NetworkState::NetworkState() :
@@ -46,7 +46,7 @@ NetworkState::NetworkState() :
 
 int NetworkState::connectionTime() const
 {
-    return m_active ? ((uv_now(uv_default_loop()) - m_connectionTime) / 1000) : 0;
+    return m_active ? (int)((uv_now(uv_default_loop()) - m_connectionTime) / 1000) : 0;
 }
 
 
@@ -56,7 +56,7 @@ uint32_t NetworkState::avgTime() const
         return 0;
     }
 
-    return (uint32_t) connectionTime() / m_latency.size();
+    return connectionTime() / (uint32_t)m_latency.size();
 }
 
 
