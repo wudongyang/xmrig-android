@@ -41,6 +41,15 @@ LOCAL_SRC_FILES :=    \
     $(XMRIG_SRC_PATH)/src/workers/MultiWorker.cpp \
     $(XMRIG_SRC_PATH)/src/workers/Worker.cpp \
     $(XMRIG_SRC_PATH)/src/workers/Workers.cpp \
+    $(XMRIG_SRC_PATH)/src/App_unix.cpp \
+    $(XMRIG_SRC_PATH)/src/Mem_unix.cpp \
+    $(XMRIG_SRC_PATH)/src/common/Platform_unix.cpp \
+    $(XMRIG_SRC_PATH)/src/common/cpu/Cpu.cpp \
+    $(XMRIG_SRC_PATH)/src/common/cpu/BasicCpuInfo_arm.cpp \
+    $(XMRIG_SRC_PATH)/src/crypto/c_blake256.c \
+    $(XMRIG_SRC_PATH)/src/crypto/c_groestl.c \
+    $(XMRIG_SRC_PATH)/src/crypto/c_jh.c \
+    $(XMRIG_SRC_PATH)/src/crypto/c_skein.c \
     $(XMRIG_SRC_PATH)/src/xmrig.cpp \
     $(XMRIG_SRC_PATH)/src/Rand_android.cpp
 
